@@ -596,6 +596,10 @@ parsers: the `word` token. If you specify a `word` token in your grammar, Tree-s
 that match strings also matched by the `word` token. Then, during lexing, instead of matching each of these keywords individually,
 Tree-sitter will match the keywords via a two-step process where it _first_ matches the `word` token.
 
+For keyword spellings matched by `word`, immediate tokens that match a single fixed spelling obey the same word boundaries,
+whether written as a string or an equivalent regular expression. They still require adjacency: whitespace before the token
+prevents it from matching. These keyword boundaries do not apply to general immediate regular expressions that match multiple spellings.
+
 For example, suppose we added `identifier` as the `word` token in our JavaScript grammar:
 
 ```js

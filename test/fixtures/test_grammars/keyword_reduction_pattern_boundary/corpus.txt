@@ -1,0 +1,50 @@
+================================================================================
+Short regex spelling after operand reduction
+================================================================================
+if (value) is# other
+---
+(program (comparison (operand (word)) (word)))
+
+================================================================================
+Longer regex spelling after operand reduction
+================================================================================
+if (value) isb# other
+---
+(program (comparison (operand (word)) (word)))
+
+================================================================================
+Immediate identifier operand followed by reduction
+================================================================================
+if a:value is# other
+---
+(program (comparison (operand (immediate_identifier)) (word)))
+
+================================================================================
+No continuation-only follower
+================================================================================
+if (value) is other
+---
+(program (comparison (operand (word)) (word)))
+
+================================================================================
+Regex keyword prefix stays inside a whole word outside comparison
+================================================================================
+isb#name
+---
+(program (word))
+
+================================================================================
+Missing right operand is rejected
+:error
+================================================================================
+if (value) isb#
+---
+(program (comparison (operand (word)) (MISSING word)))
+
+================================================================================
+Unknown comparison keyword is rejected
+:error
+================================================================================
+if (value) other name
+---
+(program (ERROR (operand (word)) (word)) (word))

@@ -1,0 +1,50 @@
+================================================================================
+Literal-length match after operand reduction
+================================================================================
+if (value) is# other
+---
+(program (comparison (operand (word)) (word)))
+
+================================================================================
+Keyword spelling stays whole outside comparison
+================================================================================
+is#name
+---
+(program (word))
+
+================================================================================
+Immediate identifier operand followed by reduction
+================================================================================
+if a:value is# other
+---
+(program (comparison (operand (immediate_identifier)) (word)))
+
+================================================================================
+No continuation-only follower
+================================================================================
+if (value) is other
+---
+(program (comparison (operand (word)) (word)))
+
+================================================================================
+Keyword-prefixed spelling remains a whole word outside comparison
+================================================================================
+isb#name
+---
+(program (word))
+
+================================================================================
+Missing right operand is rejected
+:error
+================================================================================
+if (value) is#
+---
+(program (comparison (operand (word)) (MISSING word)))
+
+================================================================================
+Unknown comparison keyword is rejected
+:error
+================================================================================
+if (value) other name
+---
+(program (ERROR (operand (word)) (word)) (word))

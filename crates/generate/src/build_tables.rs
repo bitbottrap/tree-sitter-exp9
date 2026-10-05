@@ -70,7 +70,7 @@ pub fn build_tables(
     let token_conflict_map = TokenConflictMap::new(lexical_grammar, following_tokens);
     let coincident_token_index =
         CoincidentTokenIndex::new(&parse_table, lexical_grammar, syntax_grammar.word_token);
-    let (keywords, unsafe_keyword_pairs) = identify_keywords(
+    let (keywords, unsafe_keyword_pairs, immediate_keywords) = identify_keywords(
         syntax_grammar,
         lexical_grammar,
         syntax_grammar.word_token,
@@ -107,6 +107,7 @@ pub fn build_tables(
         &coincident_token_index,
         &token_conflict_map,
         &unsafe_keyword_pairs,
+        &immediate_keywords,
         str_pool,
     );
     populate_external_lex_states(&mut parse_table, syntax_grammar);
@@ -349,15 +350,16 @@ fn identify_keywords(
     token_conflict_map: &TokenConflictMap,
     coincident_token_index: &CoincidentTokenIndex,
     str_pool: &StrPool,
-) -> (TokenSet, Vec<(Symbol, Symbol)>) {
+) -> (TokenSet, Vec<(Symbol, Symbol)>, TokenSet) {
     if word_token.is_none() {
-        return (TokenSet::new(), Vec::new());
+        return (TokenSet::new(), Vec::new(), TokenSet::new());
     }
 
     let word_token = word_token.unwrap();
     let mut unsafe_pairs: Vec<(Symbol, Symbol)> = Vec::new();
     let mut cursor = NfaCursor::new(&lexical_grammar.nfa, Vec::new());
     let mut guard_demoted = TokenSet::new();
+    let mut immediate_keywords = TokenSet::new();
 
     // First find all of the candidate keyword tokens: tokens that start with
     // letters or underscore and can match the same string as a word token.
@@ -376,6 +378,11 @@ fn identify_keywords(
                     str_pool.resolve(lexical_grammar.variables[i].name)
                 );
                 // Immediate tokens can't be context-free keywords.
+                if variable.is_immediate
+                    && token_has_single_spelling(lexical_grammar, variable.start_state)
+                {
+                    immediate_keywords.insert(Symbol::terminal(i));
+                }
                 let explicitly_reserved = syntax_grammar
                     .reserved_word_sets
                     .iter()
@@ -420,7 +427,7 @@ fn identify_keywords(
     // Exclude keyword candidates for which substituting the keyword capture
     // token would introduce new lexical conflicts with other tokens.
 
-    for token in keywords.iter() {
+    for token in keywords.iter().chain(guard_demoted.iter()) {
         for other_index in 0..lexical_grammar.variables.len() {
             if keyword_candidates.contains(Symbol::terminal(other_index)) {
                 continue;
@@ -462,7 +469,32 @@ fn identify_keywords(
             str_pool.resolve(lexical_grammar.variables[token.index as usize].name),
         );
     }
-    (keywords, unsafe_pairs)
+    (keywords, unsafe_pairs, immediate_keywords)
+}
+
+fn token_has_single_spelling(lexical_grammar: &LexicalGrammar, start_state: u32) -> bool {
+    let mut cursor = NfaCursor::new(&lexical_grammar.nfa, vec![start_state]);
+    for length in 0..=lexical_grammar.nfa.states.len() {
+        let transitions = cursor
+            .transitions()
+            .into_iter()
+            .filter(|transition| !transition.is_separator)
+            .collect::<Vec<_>>();
+        if cursor.completions().next().is_some() {
+            return length > 0 && transitions.is_empty();
+        }
+        let mut characters = CharacterSet::empty();
+        let mut next_states = Vec::new();
+        for transition in transitions {
+            characters = characters.add(&transition.characters);
+            next_states.extend(transition.states);
+        }
+        if characters.char_codes().take(2).count() != 1 {
+            return false;
+        }
+        cursor.reset(next_states);
+    }
+    false
 }
 
 fn mark_fragile_tokens(parse_table: &mut ParseTable, token_conflict_map: &TokenConflictMap) {
